@@ -1,0 +1,542 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#F2F0E9" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#131A26" media="(prefers-color-scheme: dark)">
+<title>이중 진자 — 3점 · 2축</title>
+<style>
+  :root{
+    --paper:#F2F0E9;
+    --grid:#DBD7CA;
+    --grid-major:#CCC7B6;
+    --ink:#22304A;
+    --ink-soft:#5A657D;
+    --trace:#A8342A;
+    --trace-twin:#3A6B8C;
+    --panel:#EAE7DD;
+    --panel-line:#C9C4B4;
+    --knob:#22304A;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --paper:#131A26;
+      --grid:#1E2939;
+      --grid-major:#273549;
+      --ink:#D9E2F2;
+      --ink-soft:#8FA0BC;
+      --trace:#E8785F;
+      --trace-twin:#6FB3D9;
+      --panel:#0E141E;
+      --panel-line:#2A3850;
+      --knob:#D9E2F2;
+    }
+  }
+  :root[data-theme="light"]{
+    --paper:#F2F0E9; --grid:#DBD7CA; --grid-major:#CCC7B6;
+    --ink:#22304A; --ink-soft:#5A657D;
+    --trace:#A8342A; --trace-twin:#3A6B8C;
+    --panel:#EAE7DD; --panel-line:#C9C4B4; --knob:#22304A;
+  }
+  :root[data-theme="dark"]{
+    --paper:#131A26; --grid:#1E2939; --grid-major:#273549;
+    --ink:#D9E2F2; --ink-soft:#8FA0BC;
+    --trace:#E8785F; --trace-twin:#6FB3D9;
+    --panel:#0E141E; --panel-line:#2A3850; --knob:#D9E2F2;
+  }
+
+  html,body{height:100%;}
+  body{
+    margin:0;
+    min-height:100dvh;
+    background:var(--paper);
+    color:var(--ink);
+    font-family:"Avenir Next","Avenir","Segoe UI",system-ui,sans-serif;
+    display:flex; flex-direction:column;
+    overscroll-behavior-y:none;
+    -webkit-tap-highlight-color:transparent;
+  }
+  button, input, label.toggle{touch-action:manipulation;}
+  header{
+    padding:1.1rem 1.5rem .9rem;
+    border-bottom:1px solid var(--panel-line);
+    display:flex; align-items:baseline; gap:1rem; flex-wrap:wrap;
+  }
+  h1{
+    margin:0;
+    font-family:"Futura","Avenir Next",system-ui,sans-serif;
+    font-weight:600;
+    font-size:1.05rem;
+    letter-spacing:.18em;
+    text-transform:uppercase;
+  }
+  header .sub{
+    color:var(--ink-soft);
+    font-size:.8rem;
+    letter-spacing:.05em;
+  }
+  main{
+    flex:1;
+    display:grid;
+    grid-template-columns:1fr 300px;
+    min-height:0;
+  }
+  @media (max-width:760px){
+    main{grid-template-columns:1fr;}
+  }
+  .stage{position:relative; min-height:420px;}
+  @media (max-width:760px){
+    /* 모바일: 캔버스가 화면의 절반 이상을 차지하고 컨트롤은 아래로 스크롤 */
+    .stage{min-height:56dvh;}
+  }
+  /* 터치 기기: 슬라이더 썸과 버튼 히트 영역 확대 */
+  @media (pointer:coarse){
+    input[type=range]{height:28px;}
+    input[type=range]::-webkit-slider-thumb{width:20px; height:20px; margin-top:-9px;}
+    input[type=range]::-moz-range-thumb{width:20px; height:20px;}
+    button{padding:.75rem .6rem;}
+    label.toggle input{width:19px; height:19px;}
+  }
+  canvas{position:absolute; inset:0; width:100%; height:100%; display:block; touch-action:none; cursor:grab;}
+  .hint{
+    position:absolute; left:1rem; bottom:.8rem;
+    font-size:.72rem; color:var(--ink-soft); letter-spacing:.04em;
+    pointer-events:none;
+  }
+
+  aside{
+    border-left:1px solid var(--panel-line);
+    background:var(--panel);
+    padding:1.1rem 1.25rem 1.5rem;
+    overflow-y:auto;
+    display:flex; flex-direction:column; gap:1.15rem;
+  }
+  @media (max-width:760px){
+    aside{border-left:none; border-top:1px solid var(--panel-line);}
+  }
+
+  .readout{
+    display:grid; grid-template-columns:1fr 1fr; gap:.5rem .9rem;
+    font-family:ui-monospace,"SF Mono",Menlo,monospace;
+    font-variant-numeric:tabular-nums;
+    font-size:.85rem;
+  }
+  .readout .lab{
+    display:block;
+    font-family:"Futura","Avenir Next",system-ui,sans-serif;
+    font-size:.62rem; letter-spacing:.16em; text-transform:uppercase;
+    color:var(--ink-soft); margin-bottom:.15rem;
+  }
+
+  fieldset{
+    border:1px solid var(--panel-line);
+    border-radius:2px;
+    margin:0; padding:.8rem .9rem .9rem;
+    display:flex; flex-direction:column; gap:.65rem;
+  }
+  legend{
+    font-family:"Futura","Avenir Next",system-ui,sans-serif;
+    font-size:.62rem; letter-spacing:.18em; text-transform:uppercase;
+    color:var(--ink-soft); padding:0 .4rem;
+  }
+  .ctl{display:flex; flex-direction:column; gap:.2rem;}
+  .ctl .row{
+    display:flex; justify-content:space-between; align-items:baseline;
+    font-size:.75rem; letter-spacing:.03em;
+  }
+  .ctl .val{
+    font-family:ui-monospace,"SF Mono",Menlo,monospace;
+    font-variant-numeric:tabular-nums;
+    color:var(--ink-soft); font-size:.72rem;
+  }
+  input[type=range]{
+    -webkit-appearance:none; appearance:none;
+    width:100%; height:18px; background:transparent; margin:0;
+  }
+  input[type=range]:disabled{opacity:.35;}
+  input[type=range]::-webkit-slider-runnable-track{
+    height:2px; background:var(--panel-line);
+  }
+  input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none; appearance:none;
+    width:13px; height:13px; border-radius:50%;
+    background:var(--knob); margin-top:-5.5px;
+  }
+  input[type=range]::-moz-range-track{height:2px; background:var(--panel-line);}
+  input[type=range]::-moz-range-thumb{
+    width:13px; height:13px; border-radius:50%; border:none; background:var(--knob);
+  }
+  input[type=range]:focus-visible{outline:2px solid var(--trace); outline-offset:4px;}
+
+  .btns{display:flex; gap:.5rem; flex-wrap:wrap;}
+  button{
+    flex:1;
+    font-family:"Futura","Avenir Next",system-ui,sans-serif;
+    font-size:.68rem; letter-spacing:.14em; text-transform:uppercase;
+    padding:.55rem .6rem;
+    background:transparent; color:var(--ink);
+    border:1px solid var(--ink); border-radius:2px;
+    cursor:pointer;
+  }
+  button:hover{background:var(--ink); color:var(--paper);}
+  button:focus-visible{outline:2px solid var(--trace); outline-offset:2px;}
+
+  label.toggle{
+    display:flex; align-items:center; gap:.55rem;
+    font-size:.78rem; letter-spacing:.03em; cursor:pointer;
+  }
+  label.toggle input{accent-color:var(--trace-twin); width:15px; height:15px;}
+  .twin-note{font-size:.7rem; color:var(--ink-soft); margin:.1rem 0 0; line-height:1.5;}
+  .swatch{display:inline-block; width:.7em; height:.7em; border-radius:50%; vertical-align:baseline; margin-right:.3em;}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>이중 진자</h1>
+  <span class="sub">고정축 O · 관절축 P₁ · 추 P₂ — 2축 3점의 카오스 운동</span>
+</header>
+
+<main>
+  <div class="stage">
+    <canvas id="cv" aria-label="이중 진자 시뮬레이션"></canvas>
+    <div class="hint">추를 드래그해서 초기 각도를 놓아 보세요</div>
+  </div>
+
+  <aside>
+    <div class="readout" aria-live="off">
+      <div><span class="lab">θ₁ (축 1)</span><span id="rt1">0.0°</span></div>
+      <div><span class="lab">θ₂ (축 2)</span><span id="rt2">0.0°</span></div>
+      <div><span class="lab">ω₁</span><span id="rw1">0.00</span></div>
+      <div><span class="lab">ω₂</span><span id="rw2">0.00</span></div>
+    </div>
+
+    <div class="btns">
+      <button id="btnPause">일시정지</button>
+      <button id="btnReset">리셋</button>
+      <button id="btnRand">무작위</button>
+    </div>
+
+    <fieldset>
+      <legend>막대 · 질량</legend>
+      <div class="ctl"><div class="row"><span>길이 L₁</span><span class="val" id="vL1"></span></div>
+        <input type="range" id="L1" min="0.5" max="2" step="0.05" value="1"></div>
+      <div class="ctl"><div class="row"><span>길이 L₂</span><span class="val" id="vL2"></span></div>
+        <input type="range" id="L2" min="0.5" max="2" step="0.05" value="1"></div>
+      <div class="ctl"><div class="row"><span>질량 m₁</span><span class="val" id="vM1"></span></div>
+        <input type="range" id="M1" min="0.2" max="3" step="0.1" value="1"></div>
+      <div class="ctl"><div class="row"><span>질량 m₂</span><span class="val" id="vM2"></span></div>
+        <input type="range" id="M2" min="0.2" max="3" step="0.1" value="1"></div>
+    </fieldset>
+
+    <fieldset>
+      <legend>환경</legend>
+      <div class="ctl"><div class="row"><span>중력 g</span><span class="val" id="vG"></span></div>
+        <input type="range" id="G" min="1" max="30" step="0.1" value="9.8"></div>
+      <div class="ctl"><div class="row"><span>감쇠</span><span class="val" id="vD"></span></div>
+        <input type="range" id="D" min="0" max="0.5" step="0.01" value="0"></div>
+      <div class="ctl"><div class="row"><span>잔상 길이</span><span class="val" id="vT"></span></div>
+        <input type="range" id="T" min="100" max="4000" step="100" value="1500"></div>
+      <label class="toggle">
+        <input type="checkbox" id="inf">
+        <span>궤적 영원히 남기기 (∞)</span>
+      </label>
+    </fieldset>
+
+    <fieldset>
+      <legend>프리셋 — 소설 『삼체』</legend>
+      <div class="btns">
+        <button id="btnStable">항세기</button>
+        <button id="btnChaos">난세기</button>
+      </div>
+      <p class="twin-note">질량은 알파 센타우리 A·B의 태양질량비(m₁=1.1, m₂=0.9). <b>항세기</b>는 태양 하나가 규칙적으로 뜨는 안정기 — g=9.8, 작은 진폭, 약한 감쇠. <b>난세기</b>는 세 태양이 함께 뜨는 삼일능공 — g=29.4(3×9.8), 뒤집힌 초기 상태에 쌍둥이 진자·영구 궤적을 켜서 삼체 문제의 예측 불가능성을 기록합니다.</p>
+    </fieldset>
+
+    <fieldset>
+      <legend>카오스 실험</legend>
+      <label class="toggle">
+        <input type="checkbox" id="twin">
+        <span><span class="swatch" style="background:var(--trace-twin)"></span>쌍둥이 진자 (Δθ₁ = 0.001°)</span>
+      </label>
+      <p class="twin-note">초기 각도가 0.001°만 다른 진자를 겹쳐 놓습니다. 처음엔 완전히 포개져 있다가 곧 전혀 다른 궤적으로 갈라집니다 — 초기 조건 민감성.</p>
+    </fieldset>
+  </aside>
+</main>
+
+<script>
+"use strict";
+const cv = document.getElementById("cv");
+const ctx = cv.getContext("2d");
+// 영구 궤적용 잉크 레이어: 매 프레임 새 선분만 덧그리고 지우지 않는다
+const ink = document.createElement("canvas");
+const ictx = ink.getContext("2d");
+
+const P = { L1:1, L2:1, M1:1, M2:1, G:9.8, D:0, T:1500 };
+let paused = false;
+
+// 상태: [θ1, ω1, θ2, ω2]
+let s  = [Math.PI*0.75, 0, Math.PI*0.55, 0];
+let s2 = null;                 // 쌍둥이
+let trail = [], trail2 = [];
+let lastP = null, lastP2 = null;   // 잉크 레이어의 직전 점
+
+function deriv(st){
+  const [t1,w1,t2,w2] = st;
+  const {L1,L2,M1,M2,G,D} = P;
+  const d = t1 - t2;
+  const den = 2*M1 + M2 - M2*Math.cos(2*d);
+  const a1 = (-G*(2*M1+M2)*Math.sin(t1) - M2*G*Math.sin(t1-2*t2)
+              - 2*Math.sin(d)*M2*(w2*w2*L2 + w1*w1*L1*Math.cos(d))) / (L1*den);
+  const a2 = (2*Math.sin(d)*(w1*w1*L1*(M1+M2) + G*(M1+M2)*Math.cos(t1)
+              + w2*w2*L2*M2*Math.cos(d))) / (L2*den);
+  return [w1, a1 - D*w1, w2, a2 - D*w2];
+}
+function rk4(st, h){
+  const k1 = deriv(st);
+  const k2 = deriv(st.map((v,i)=>v + h/2*k1[i]));
+  const k3 = deriv(st.map((v,i)=>v + h/2*k2[i]));
+  const k4 = deriv(st.map((v,i)=>v + h*k3[i]));
+  return st.map((v,i)=>v + h/6*(k1[i] + 2*k2[i] + 2*k3[i] + k4[i]));
+}
+
+function scalePx(){
+  const m = Math.min(cv.clientWidth, cv.clientHeight);
+  return m * 0.42 / (P.L1 + P.L2);
+}
+function origin(){ return [cv.clientWidth/2, cv.clientHeight*0.42]; }
+function points(st){
+  const k = scalePx(), [ox,oy] = origin();
+  const x1 = ox + k*P.L1*Math.sin(st[0]), y1 = oy + k*P.L1*Math.cos(st[0]);
+  const x2 = x1 + k*P.L2*Math.sin(st[2]), y2 = y1 + k*P.L2*Math.cos(st[2]);
+  return [ox,oy,x1,y1,x2,y2];
+}
+
+function css(name){ return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+
+function inkSeg(a, b, color){
+  ictx.strokeStyle = color;
+  ictx.lineWidth = 1.2; ictx.lineCap = "round";
+  ictx.beginPath(); ictx.moveTo(a[0],a[1]); ictx.lineTo(b[0],b[1]); ictx.stroke();
+}
+function clearInk(){
+  ictx.clearRect(0, 0, cv.clientWidth, cv.clientHeight);
+  lastP = null; lastP2 = null;
+}
+function clearTraces(){ trail = []; trail2 = []; clearInk(); }
+
+function drawGrid(w,h){
+  const step = 28;
+  ctx.lineWidth = 1;
+  for(let x = (w/2)%step, i=0; x < w; x += step, i++){
+    ctx.strokeStyle = (Math.round(x - w/2)/step) % 4 === 0 ? css("--grid-major") : css("--grid");
+    ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,h); ctx.stroke();
+  }
+  for(let y = (h*0.42)%step; y < h; y += step){
+    ctx.strokeStyle = (Math.round(y - h*0.42)/step) % 4 === 0 ? css("--grid-major") : css("--grid");
+    ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(w,y); ctx.stroke();
+  }
+}
+function drawTrail(tr, color){
+  if(tr.length < 2) return;
+  ctx.lineWidth = 1.4; ctx.lineJoin = "round"; ctx.lineCap = "round";
+  ctx.strokeStyle = color;
+  const n = tr.length;
+  // 오래된 구간일수록 옅게: 4구간으로 나눠 알파를 계단식 적용
+  const seg = 4;
+  for(let sgi=0; sgi<seg; sgi++){
+    const a = Math.floor(n*sgi/seg), b = Math.min(n-1, Math.floor(n*(sgi+1)/seg));
+    if(b <= a) continue;
+    ctx.globalAlpha = 0.12 + 0.8*(sgi+1)/seg;
+    ctx.beginPath();
+    ctx.moveTo(tr[a][0], tr[a][1]);
+    for(let i=a+1;i<=b;i++) ctx.lineTo(tr[i][0], tr[i][1]);
+    ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+}
+function drawPendulum(st, inkColor, bob, ghost){
+  const [ox,oy,x1,y1,x2,y2] = points(st);
+  ctx.globalAlpha = ghost ? 0.55 : 1;
+  ctx.strokeStyle = inkColor; ctx.lineWidth = 2; ctx.lineCap = "round";
+  ctx.beginPath(); ctx.moveTo(ox,oy); ctx.lineTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke();
+
+  const r1 = 5 + 3*Math.sqrt(P.M1), r2 = 5 + 3*Math.sqrt(P.M2);
+  // 고정축: 십자 표시
+  ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.moveTo(ox-6,oy); ctx.lineTo(ox+6,oy); ctx.moveTo(ox,oy-6); ctx.lineTo(ox,oy+6); ctx.stroke();
+  ctx.beginPath(); ctx.arc(ox,oy,4,0,7); ctx.stroke();
+  // 관절축 P1 (속 빈 원 = 축), 추 P2 (채운 원)
+  ctx.fillStyle = css("--paper");
+  ctx.beginPath(); ctx.arc(x1,y1,r1,0,7); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = bob;
+  ctx.beginPath(); ctx.arc(x2,y2,r2,0,7); ctx.fill();
+  ctx.globalAlpha = 1;
+}
+
+function frame(){
+  const infinite = inf.checked;
+  if(!paused && !drag){
+    const sub = 4, h = 1/60/sub;
+    for(let i=0;i<sub;i++){
+      s = rk4(s, h);
+      if(s2) s2 = rk4(s2, h);
+    }
+    const p = points(s);
+    if(infinite){
+      if(lastP) inkSeg(lastP, [p[4],p[5]], css("--trace"));
+      lastP = [p[4],p[5]];
+      if(s2){
+        const q = points(s2);
+        if(lastP2) inkSeg(lastP2, [q[4],q[5]], css("--trace-twin"));
+        lastP2 = [q[4],q[5]];
+      }
+    }else{
+      trail.push([p[4],p[5]]);
+      if(s2){ const q = points(s2); trail2.push([q[4],q[5]]); }
+      while(trail.length  > P.T) trail.shift();
+      while(trail2.length > P.T) trail2.shift();
+    }
+  }
+  const w = cv.clientWidth, h = cv.clientHeight;
+  ctx.clearRect(0,0,w,h);
+  drawGrid(w,h);
+  if(infinite){
+    ctx.drawImage(ink, 0, 0, w, h);
+  }else{
+    drawTrail(trail2, css("--trace-twin"));
+    drawTrail(trail,  css("--trace"));
+  }
+  if(s2) drawPendulum(s2, css("--ink-soft"), css("--trace-twin"), true);
+  drawPendulum(s, css("--ink"), css("--trace"), false);
+  updateReadout();
+  requestAnimationFrame(frame);
+}
+
+const deg = r => ((r*180/Math.PI % 360)+540)%360 - 180;
+function updateReadout(){
+  rt1.textContent = deg(s[0]).toFixed(1) + "°";
+  rt2.textContent = deg(s[2]).toFixed(1) + "°";
+  rw1.textContent = s[1].toFixed(2);
+  rw2.textContent = s[3].toFixed(2);
+}
+
+// ── 캔버스 해상도 ──
+function resize(){
+  const dpr = window.devicePixelRatio || 1;
+  cv.width  = cv.clientWidth  * dpr;
+  cv.height = cv.clientHeight * dpr;
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  ink.width  = cv.width;          // 크기 변경 시 잉크 레이어는 비워진다
+  ink.height = cv.height;
+  ictx.setTransform(dpr,0,0,dpr,0,0);
+  lastP = null; lastP2 = null;
+}
+window.addEventListener("resize", resize);
+
+// ── 드래그로 초기 각도 설정 ──
+let drag = null; // "p1" | "p2"
+cv.addEventListener("pointerdown", e=>{
+  const r = cv.getBoundingClientRect();
+  const mx = e.clientX - r.left, my = e.clientY - r.top;
+  const [,,x1,y1,x2,y2] = points(s);
+  const d1 = Math.hypot(mx-x1,my-y1), d2 = Math.hypot(mx-x2,my-y2);
+  if(Math.min(d1,d2) < 40){
+    drag = d2 <= d1 ? "p2" : "p1";
+    cv.setPointerCapture(e.pointerId);
+    cv.style.cursor = "grabbing";
+  }
+});
+cv.addEventListener("pointermove", e=>{
+  if(!drag) return;
+  const r = cv.getBoundingClientRect();
+  const mx = e.clientX - r.left, my = e.clientY - r.top;
+  const [ox,oy,x1,y1] = points(s);
+  if(drag === "p1") s[0] = Math.atan2(mx-ox, my-oy);
+  else              s[2] = Math.atan2(mx-x1, my-y1);
+  s[1] = 0; s[3] = 0;
+  clearTraces();
+  syncTwin();
+});
+cv.addEventListener("pointerup", ()=>{ drag = null; cv.style.cursor = "grab"; });
+
+// ── 컨트롤 ──
+const $ = id => document.getElementById(id);
+const rt1=$("rt1"), rt2=$("rt2"), rw1=$("rw1"), rw2=$("rw2");
+const inf = $("inf");
+const fmt = { L1:v=>v.toFixed(2)+" m", L2:v=>v.toFixed(2)+" m",
+              M1:v=>v.toFixed(1)+" kg", M2:v=>v.toFixed(1)+" kg",
+              G:v=>v.toFixed(1)+" m/s²", D:v=>v.toFixed(2), T:v=>v+" 점" };
+for(const k of ["L1","L2","M1","M2","G","D","T"]){
+  const el = $(k), out = $("v"+k);
+  const show = ()=>{ out.textContent = fmt[k](+el.value); };
+  el.addEventListener("input", ()=>{
+    P[k] = +el.value; show();
+    if(k==="L1"||k==="L2") clearTraces();
+  });
+  show();
+}
+
+function syncTwin(){
+  if($("twin").checked){
+    s2 = s.slice(); s2[0] += 0.001*Math.PI/180;
+  } else s2 = null;
+  trail2 = []; lastP2 = null;
+}
+$("twin").addEventListener("change", syncTwin);
+
+inf.addEventListener("change", ()=>{
+  clearTraces();
+  $("T").disabled = inf.checked;   // 영구 모드에서는 잔상 길이가 의미 없음
+});
+
+// 테마가 바뀌면 잉크 색이 지면과 안 맞으므로 잉크 레이어를 비운다
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change", clearInk);
+new MutationObserver(clearInk)
+  .observe(document.documentElement, { attributes:true, attributeFilter:["data-theme"] });
+
+// ── 『삼체』 프리셋 ──
+const rad = d => d*Math.PI/180;
+const PRESETS = {
+  // 항세기: 태양 하나 — 규칙적이고 예측 가능한 시대
+  stable: { L1:1.2, L2:0.8, M1:1.1, M2:0.9, G:9.8,  D:0.02, T:1500,
+            s:[rad(24), 0, rad(24), 0],   twin:false, inf:false },
+  // 난세기: 삼일능공 — 세 태양의 인력(3×9.8), 뒤집힌 초기 상태
+  chaos:  { L1:1,   L2:1,   M1:1.1, M2:0.9, G:29.4, D:0,    T:1500,
+            s:[rad(175), 0, rad(-160), 0], twin:true,  inf:true },
+};
+function setCtl(k, v){
+  const el = $(k);
+  el.value = v; P[k] = +el.value;
+  $("v"+k).textContent = fmt[k](+el.value);
+}
+function applyPreset(p){
+  for(const k of ["L1","L2","M1","M2","G","D","T"]) setCtl(k, p[k]);
+  s = p.s.slice();
+  $("twin").checked = p.twin;
+  inf.checked = p.inf; $("T").disabled = p.inf;
+  paused = false; $("btnPause").textContent = "일시정지";
+  clearTraces(); syncTwin();
+}
+$("btnStable").addEventListener("click", ()=>applyPreset(PRESETS.stable));
+$("btnChaos").addEventListener("click", ()=>applyPreset(PRESETS.chaos));
+
+$("btnPause").addEventListener("click", e=>{
+  paused = !paused;
+  e.target.textContent = paused ? "재생" : "일시정지";
+});
+$("btnReset").addEventListener("click", ()=>{
+  s = [Math.PI*0.75, 0, Math.PI*0.55, 0];
+  clearTraces(); syncTwin();
+});
+$("btnRand").addEventListener("click", ()=>{
+  s = [ (Math.random()*1.6+0.4)*Math.PI * (Math.random()<.5?-1:1), 0,
+        (Math.random()*2-1)*Math.PI, 0 ];
+  clearTraces(); syncTwin();
+});
+
+resize();
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
