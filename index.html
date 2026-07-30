@@ -18,6 +18,7 @@
     --panel:#EAE7DD;
     --panel-line:#C9C4B4;
     --knob:#22304A;
+    --sun:#C08A2E;
   }
   @media (prefers-color-scheme: dark){
     :root{
@@ -31,19 +32,20 @@
       --panel:#0E141E;
       --panel-line:#2A3850;
       --knob:#D9E2F2;
+      --sun:#E3B14F;
     }
   }
   :root[data-theme="light"]{
     --paper:#F2F0E9; --grid:#DBD7CA; --grid-major:#CCC7B6;
     --ink:#22304A; --ink-soft:#5A657D;
     --trace:#A8342A; --trace-twin:#3A6B8C;
-    --panel:#EAE7DD; --panel-line:#C9C4B4; --knob:#22304A;
+    --panel:#EAE7DD; --panel-line:#C9C4B4; --knob:#22304A; --sun:#C08A2E;
   }
   :root[data-theme="dark"]{
     --paper:#131A26; --grid:#1E2939; --grid-major:#273549;
     --ink:#D9E2F2; --ink-soft:#8FA0BC;
     --trace:#E8785F; --trace-twin:#6FB3D9;
-    --panel:#0E141E; --panel-line:#2A3850; --knob:#D9E2F2;
+    --panel:#0E141E; --panel-line:#2A3850; --knob:#D9E2F2; --sun:#E3B14F;
   }
 
   html,body{height:100%;}
@@ -180,6 +182,7 @@
     cursor:pointer;
   }
   button:hover{background:var(--ink); color:var(--paper);}
+  button.on{background:var(--ink); color:var(--paper);}
   button:focus-visible{outline:2px solid var(--trace); outline-offset:2px;}
 
   label.toggle{
@@ -201,15 +204,20 @@
 <main>
   <div class="stage">
     <canvas id="cv" aria-label="이중 진자 시뮬레이션"></canvas>
-    <div class="hint">추를 드래그해서 초기 각도를 놓아 보세요</div>
+    <div class="hint" id="hint">추를 드래그해서 초기 각도를 놓아 보세요</div>
   </div>
 
   <aside>
+    <div class="btns">
+      <button id="mPend" class="on">이중 진자</button>
+      <button id="mTri">삼체 궤도</button>
+    </div>
+
     <div class="readout" aria-live="off">
-      <div><span class="lab">θ₁ (축 1)</span><span id="rt1">0.0°</span></div>
-      <div><span class="lab">θ₂ (축 2)</span><span id="rt2">0.0°</span></div>
-      <div><span class="lab">ω₁</span><span id="rw1">0.00</span></div>
-      <div><span class="lab">ω₂</span><span id="rw2">0.00</span></div>
+      <div><span class="lab" id="lb1">θ₁ (축 1)</span><span id="rt1">0.0°</span></div>
+      <div><span class="lab" id="lb2">θ₂ (축 2)</span><span id="rt2">0.0°</span></div>
+      <div><span class="lab" id="lb3">ω₁</span><span id="rw1">0.00</span></div>
+      <div><span class="lab" id="lb4">ω₂</span><span id="rw2">0.00</span></div>
     </div>
 
     <div class="btns">
@@ -218,7 +226,7 @@
       <button id="btnRand">무작위</button>
     </div>
 
-    <fieldset>
+    <fieldset class="pend-only">
       <legend>막대 · 질량</legend>
       <div class="ctl"><div class="row"><span>길이 L₁</span><span class="val" id="vL1"></span></div>
         <input type="range" id="L1" min="0.5" max="2" step="0.05" value="1"></div>
@@ -232,10 +240,12 @@
 
     <fieldset>
       <legend>환경</legend>
-      <div class="ctl"><div class="row"><span>중력 g</span><span class="val" id="vG"></span></div>
+      <div class="ctl pend-only"><div class="row"><span>중력 g</span><span class="val" id="vG"></span></div>
         <input type="range" id="G" min="1" max="30" step="0.1" value="9.8"></div>
-      <div class="ctl"><div class="row"><span>감쇠</span><span class="val" id="vD"></span></div>
+      <div class="ctl pend-only"><div class="row"><span>감쇠</span><span class="val" id="vD"></span></div>
         <input type="range" id="D" min="0" max="0.5" step="0.01" value="0"></div>
+      <div class="ctl"><div class="row"><span>배속</span><span class="val" id="vS"></span></div>
+        <input type="range" id="S" min="0.1" max="4" step="0.1" value="1"></div>
       <div class="ctl"><div class="row"><span>잔상 길이</span><span class="val" id="vT"></span></div>
         <input type="range" id="T" min="100" max="4000" step="100" value="1500"></div>
       <label class="toggle">
@@ -250,16 +260,16 @@
         <button id="btnStable">항세기</button>
         <button id="btnChaos">난세기</button>
       </div>
-      <p class="twin-note">질량은 알파 센타우리 A·B의 태양질량비(m₁=1.1, m₂=0.9). <b>항세기</b>는 태양 하나가 규칙적으로 뜨는 안정기 — g=9.8, 작은 진폭, 약한 감쇠. <b>난세기</b>는 세 태양이 함께 뜨는 삼일능공 — g=29.4(3×9.8), 뒤집힌 초기 상태에 쌍둥이 진자·영구 궤적을 켜서 삼체 문제의 예측 불가능성을 기록합니다.</p>
+      <p class="twin-note" id="presetNote">질량은 알파 센타우리 A·B의 태양질량비(m₁=1.1, m₂=0.9), 길이는 두 별의 반지름비(R_A≈1.22, R_B≈0.86 R☉ → L₁=1.2, L₂=0.85). <b>항세기</b>는 태양 하나가 규칙적으로 뜨는 안정기 — g=9.8, 작은 진폭, 약한 감쇠. <b>난세기</b>는 세 태양이 함께 뜨는 삼일능공 — g=29.4(3×9.8), 뒤집힌 초기 상태에 쌍둥이 진자·영구 궤적을 켜서 삼체 문제의 예측 불가능성을 기록합니다.</p>
     </fieldset>
 
     <fieldset>
       <legend>카오스 실험</legend>
       <label class="toggle">
         <input type="checkbox" id="twin">
-        <span><span class="swatch" style="background:var(--trace-twin)"></span>쌍둥이 진자 (Δθ₁ = 0.001°)</span>
+        <span><span class="swatch" style="background:var(--trace-twin)"></span><span id="twinLab">쌍둥이 진자 (Δθ₁ = 0.001°)</span></span>
       </label>
-      <p class="twin-note">초기 각도가 0.001°만 다른 진자를 겹쳐 놓습니다. 처음엔 완전히 포개져 있다가 곧 전혀 다른 궤적으로 갈라집니다 — 초기 조건 민감성.</p>
+      <p class="twin-note" id="twinNote">초기 각도가 0.001°만 다른 진자를 겹쳐 놓습니다. 처음엔 완전히 포개져 있다가 곧 전혀 다른 궤적으로 갈라집니다 — 초기 조건 민감성.</p>
     </fieldset>
   </aside>
 </main>
@@ -272,14 +282,24 @@ const ctx = cv.getContext("2d");
 const ink = document.createElement("canvas");
 const ictx = ink.getContext("2d");
 
-const P = { L1:1, L2:1, M1:1, M2:1, G:9.8, D:0, T:1500 };
+const P = { L1:1, L2:1, M1:1, M2:1, G:9.8, D:0, S:1, T:1500 };
 let paused = false;
+let mode = "pend";             // "pend" 이중 진자 | "tri" 삼체 궤도
 
 // 상태: [θ1, ω1, θ2, ω2]
 let s  = [Math.PI*0.75, 0, Math.PI*0.55, 0];
 let s2 = null;                 // 쌍둥이
-let trail = [], trail2 = [];
-let lastP = null, lastP2 = null;   // 잉크 레이어의 직전 점
+let trails = {};    // key → {pts:[], col} — 움직이는 모든 점의 잔상
+let lastPts = {};   // 잉크 레이어(∞)의 직전 점들
+function pushTrail(key, col, p){
+  const t = trails[key] || (trails[key] = {pts:[], col});
+  t.pts.push(p);
+  while(t.pts.length > P.T) t.pts.shift();
+}
+function inkPush(key, col, p){
+  if(lastPts[key]) inkSeg(lastPts[key], p, css(col));
+  lastPts[key] = p;
+}
 
 function deriv(st){
   const [t1,w1,t2,w2] = st;
@@ -292,12 +312,83 @@ function deriv(st){
               + w2*w2*L2*M2*Math.cos(d))) / (L2*den);
   return [w1, a1 - D*w1, w2, a2 - D*w2];
 }
-function rk4(st, h){
-  const k1 = deriv(st);
-  const k2 = deriv(st.map((v,i)=>v + h/2*k1[i]));
-  const k3 = deriv(st.map((v,i)=>v + h/2*k2[i]));
-  const k4 = deriv(st.map((v,i)=>v + h*k3[i]));
+function rk4(st, h, f = deriv){
+  const k1 = f(st);
+  const k2 = f(st.map((v,i)=>v + h/2*k1[i]));
+  const k3 = f(st.map((v,i)=>v + h/2*k2[i]));
+  const k4 = f(st.map((v,i)=>v + h*k3[i]));
   return st.map((v,i)=>v + h/6*(k1[i] + 2*k2[i] + 2*k3[i] + k4[i]));
+}
+
+// ── 삼체(중력 다체) 모드 ──
+// 태양 A·B·프록시마가 만유인력(G=1)으로 상호작용하고,
+// 행성(과 쌍둥이)은 질량 없는 시험 입자로 그 중력장을 떠돈다
+const TB = { M:[1.1, 0.9, 0.12], eps:0.05 };
+let u = null;          // [x,y,vx,vy] × (태양 3 + 행성 1 + 쌍둥이 0~1)
+let lastTri = null;    // 리셋용: 마지막으로 적용한 삼체 프리셋
+let cam = null;        // {cx,cy,k} 세 태양을 따라가는 카메라 (세계좌표 중심, px 스케일)
+
+function derivTB(st){
+  const n = st.length/4, out = new Array(st.length);
+  for(let i=0;i<n;i++){
+    const xi = st[4*i], yi = st[4*i+1];
+    let ax = 0, ay = 0;
+    for(let j=0;j<3;j++){            // 태양만 인력을 행사한다
+      if(j === i) continue;
+      const dx = st[4*j]-xi, dy = st[4*j+1]-yi;
+      const r2 = dx*dx + dy*dy + TB.eps*TB.eps;   // 근접 특이점 완화(softening)
+      const f = TB.M[j]/(r2*Math.sqrt(r2));
+      ax += f*dx; ay += f*dy;
+    }
+    out[4*i] = st[4*i+2]; out[4*i+1] = st[4*i+3];
+    out[4*i+2] = ax; out[4*i+3] = ay;
+  }
+  return out;
+}
+function updateCam(){
+  let cx = 0, cy = 0;
+  for(let i=0;i<3;i++){ cx += u[4*i]; cy += u[4*i+1]; }
+  cx /= 3; cy /= 3;
+  let R = 3;
+  for(let i=0;i<3;i++) R = Math.max(R, Math.hypot(u[4*i]-cx, u[4*i+1]-cy) + 1.2);
+  R = Math.min(R, 25);               // 태양이 추방돼도 무한정 축소하지 않는다
+  const k = Math.min(cv.clientWidth, cv.clientHeight)*0.45/R;
+  if(!cam) cam = {cx, cy, k};
+  else{ cam.cx += (cx-cam.cx)*0.04; cam.cy += (cy-cam.cy)*0.04; cam.k += (k-cam.k)*0.04; }
+}
+function w2s(p){ return [cv.clientWidth/2 + cam.k*(p[0]-cam.cx), cv.clientHeight/2 - cam.k*(p[1]-cam.cy)]; }
+function s2w(x, y){ return [(x-cv.clientWidth/2)/cam.k + cam.cx, -(y-cv.clientHeight/2)/cam.k + cam.cy]; }
+
+// 행성이 계를 탈출하려 하면(태양 질량중심에서 10 이상 + 멀어지는 중)
+// 속도의 지름 성분을 반사한다 — 혜성처럼 긴 호를 그리며 되돌아온다
+function reboundPlanets(){
+  let cx = 0, cy = 0, mm = 0;
+  for(let i=0;i<3;i++){ cx += TB.M[i]*u[4*i]; cy += TB.M[i]*u[4*i+1]; mm += TB.M[i]; }
+  cx /= mm; cy /= mm;
+  for(let b=12; b<u.length; b+=4){
+    const dx = u[b]-cx, dy = u[b+1]-cy, d = Math.hypot(dx, dy);
+    if(d > 10){
+      const vr = (u[b+2]*dx + u[b+3]*dy)/d;
+      if(vr > 0){ u[b+2] -= 2*vr*dx/d; u[b+3] -= 2*vr*dy/d; }
+    }
+  }
+}
+
+function drawTri(){
+  ctx.lineWidth = 1.2;
+  for(let i=0;i<3;i++){
+    const [x,y] = w2s([u[4*i], u[4*i+1]]);
+    ctx.fillStyle = css("--sun"); ctx.strokeStyle = css("--ink");
+    ctx.beginPath(); ctx.arc(x, y, 4+6*Math.sqrt(TB.M[i]), 0, 7); ctx.fill(); ctx.stroke();
+  }
+  if(u.length > 16){
+    const [x,y] = w2s([u[16], u[17]]);
+    ctx.globalAlpha = .55; ctx.fillStyle = css("--trace-twin");
+    ctx.beginPath(); ctx.arc(x, y, 4.5, 0, 7); ctx.fill(); ctx.globalAlpha = 1;
+  }
+  const [x,y] = w2s([u[12], u[13]]);
+  ctx.fillStyle = css("--trace");
+  ctx.beginPath(); ctx.arc(x, y, 4.5, 0, 7); ctx.fill();
 }
 
 function scalePx(){
@@ -321,9 +412,9 @@ function inkSeg(a, b, color){
 }
 function clearInk(){
   ictx.clearRect(0, 0, cv.clientWidth, cv.clientHeight);
-  lastP = null; lastP2 = null;
+  lastPts = {};
 }
-function clearTraces(){ trail = []; trail2 = []; clearInk(); }
+function clearTraces(){ trails = {}; clearInk(); }
 
 function drawGrid(w,h){
   const step = 28;
@@ -374,47 +465,68 @@ function drawPendulum(st, inkColor, bob, ghost){
   ctx.globalAlpha = 1;
 }
 
-function frame(){
+let lastT = null;
+function frame(now){
+  // 실제 경과 시간 기준으로 진행 — 주사율(60/120Hz)과 무관하게 1배속 보장.
+  // 탭 복귀 등 긴 공백은 0.05s로 잘라 폭주를 막는다
+  const dt = Math.min(((now ?? 0) - (lastT ?? now ?? 0))/1000, 0.05);
+  lastT = now;
   const infinite = inf.checked;
-  if(!paused && !drag){
-    const sub = 4, h = 1/60/sub;
+  if(mode === "tri") updateCam();
+  if(!paused && !drag && dt > 0){
+    // 배속만큼 시뮬레이션 시간을 더 진행하되, 스텝 크기는 h ≤ 1/960로 유지한다
+    const sub = Math.max(1, Math.ceil(960*dt*P.S)), h = dt*P.S/sub;
     for(let i=0;i<sub;i++){
-      s = rk4(s, h);
-      if(s2) s2 = rk4(s2, h);
+      if(mode === "pend"){ s = rk4(s, h); if(s2) s2 = rk4(s2, h); }
+      else u = rk4(u, h, derivTB);
     }
-    const p = points(s);
-    if(infinite){
-      if(lastP) inkSeg(lastP, [p[4],p[5]], css("--trace"));
-      lastP = [p[4],p[5]];
+    if(mode === "tri") reboundPlanets();
+    // 움직이는 모든 점이 잔상을 남긴다 (진자: 화면좌표, 삼체: 세계좌표 — 카메라가 움직이므로)
+    // 먼저 넣은 궤적이 아래에 깔린다: 쌍둥이 → 관절/태양 → 추/행성
+    const put = infinite ? inkPush : pushTrail;
+    if(mode === "pend"){
       if(s2){
-        const q = points(s2);
-        if(lastP2) inkSeg(lastP2, [q[4],q[5]], css("--trace-twin"));
-        lastP2 = [q[4],q[5]];
+        const b = points(s2);
+        put("q1", "--trace-twin", [b[2], b[3]]);
+        put("q2", "--trace-twin", [b[4], b[5]]);
       }
+      const a = points(s);
+      put("p1", "--ink-soft", [a[2], a[3]]);
+      put("p2", "--trace",    [a[4], a[5]]);
     }else{
-      trail.push([p[4],p[5]]);
-      if(s2){ const q = points(s2); trail2.push([q[4],q[5]]); }
-      while(trail.length  > P.T) trail.shift();
-      while(trail2.length > P.T) trail2.shift();
+      for(let i=0;i<3;i++) put("s"+i, "--sun", [u[4*i], u[4*i+1]]);
+      if(u.length > 16) put("q", "--trace-twin", [u[16], u[17]]);
+      put("p", "--trace", [u[12], u[13]]);
     }
   }
   const w = cv.clientWidth, h = cv.clientHeight;
   ctx.clearRect(0,0,w,h);
   drawGrid(w,h);
-  if(infinite){
+  if(mode === "tri"){
+    for(const t of Object.values(trails)) drawTrail(t.pts.map(pt=>w2s(pt)), css(t.col));
+    drawTri();
+  }else if(infinite){
     ctx.drawImage(ink, 0, 0, w, h);
   }else{
-    drawTrail(trail2, css("--trace-twin"));
-    drawTrail(trail,  css("--trace"));
+    for(const t of Object.values(trails)) drawTrail(t.pts, css(t.col));
   }
-  if(s2) drawPendulum(s2, css("--ink-soft"), css("--trace-twin"), true);
-  drawPendulum(s, css("--ink"), css("--trace"), false);
+  if(mode === "pend"){
+    if(s2) drawPendulum(s2, css("--ink-soft"), css("--trace-twin"), true);
+    drawPendulum(s, css("--ink"), css("--trace"), false);
+  }
   updateReadout();
   requestAnimationFrame(frame);
 }
 
 const deg = r => ((r*180/Math.PI % 360)+540)%360 - 180;
 function updateReadout(){
+  if(mode === "tri"){
+    rt1.textContent = Math.hypot(u[0]-u[12], u[1]-u[13]).toFixed(2);
+    rt2.textContent = Math.hypot(u[4]-u[12], u[5]-u[13]).toFixed(2);
+    rw1.textContent = Math.hypot(u[8]-u[12], u[9]-u[13]).toFixed(2);
+    rw2.textContent = Math.hypot(u[14], u[15]).toFixed(2);
+    return;
+  }
   rt1.textContent = deg(s[0]).toFixed(1) + "°";
   rt2.textContent = deg(s[2]).toFixed(1) + "°";
   rw1.textContent = s[1].toFixed(2);
@@ -430,7 +542,7 @@ function resize(){
   ink.width  = cv.width;          // 크기 변경 시 잉크 레이어는 비워진다
   ink.height = cv.height;
   ictx.setTransform(dpr,0,0,dpr,0,0);
-  lastP = null; lastP2 = null;
+  lastPts = {};
 }
 window.addEventListener("resize", resize);
 
@@ -439,6 +551,15 @@ let drag = null; // "p1" | "p2"
 cv.addEventListener("pointerdown", e=>{
   const r = cv.getBoundingClientRect();
   const mx = e.clientX - r.left, my = e.clientY - r.top;
+  if(mode === "tri"){
+    const [x,y] = w2s([u[12], u[13]]);
+    if(Math.hypot(mx-x, my-y) < 40){
+      drag = "pl";
+      cv.setPointerCapture(e.pointerId);
+      cv.style.cursor = "grabbing";
+    }
+    return;
+  }
   const [,,x1,y1,x2,y2] = points(s);
   const d1 = Math.hypot(mx-x1,my-y1), d2 = Math.hypot(mx-x2,my-y2);
   if(Math.min(d1,d2) < 40){
@@ -451,6 +572,12 @@ cv.addEventListener("pointermove", e=>{
   if(!drag) return;
   const r = cv.getBoundingClientRect();
   const mx = e.clientX - r.left, my = e.clientY - r.top;
+  if(drag === "pl"){
+    const wp = s2w(mx, my);
+    u[12] = wp[0]; u[13] = wp[1]; u[14] = 0; u[15] = 0;
+    clearTraces(); syncTwin();
+    return;
+  }
   const [ox,oy,x1,y1] = points(s);
   if(drag === "p1") s[0] = Math.atan2(mx-ox, my-oy);
   else              s[2] = Math.atan2(mx-x1, my-y1);
@@ -466,8 +593,8 @@ const rt1=$("rt1"), rt2=$("rt2"), rw1=$("rw1"), rw2=$("rw2");
 const inf = $("inf");
 const fmt = { L1:v=>v.toFixed(2)+" m", L2:v=>v.toFixed(2)+" m",
               M1:v=>v.toFixed(1)+" kg", M2:v=>v.toFixed(1)+" kg",
-              G:v=>v.toFixed(1)+" m/s²", D:v=>v.toFixed(2), T:v=>v+" 점" };
-for(const k of ["L1","L2","M1","M2","G","D","T"]){
+              G:v=>v.toFixed(1)+" m/s²", D:v=>v.toFixed(2), S:v=>v.toFixed(1)+"×", T:v=>v+" 점" };
+for(const k of ["L1","L2","M1","M2","G","D","S","T"]){
   const el = $(k), out = $("v"+k);
   const show = ()=>{ out.textContent = fmt[k](+el.value); };
   el.addEventListener("input", ()=>{
@@ -478,10 +605,15 @@ for(const k of ["L1","L2","M1","M2","G","D","T"]){
 }
 
 function syncTwin(){
-  if($("twin").checked){
+  if(mode === "tri"){
+    if(u){
+      u = u.slice(0, 16);
+      if($("twin").checked) u.push(u[12]+0.001, u[13], u[14], u[15]);
+    }
+  }else if($("twin").checked){
     s2 = s.slice(); s2[0] += 0.001*Math.PI/180;
-  } else s2 = null;
-  trail2 = []; lastP2 = null;
+  }else s2 = null;
+  for(const k of ["q1","q2","q"]){ delete trails[k]; delete lastPts[k]; }
 }
 $("twin").addEventListener("change", syncTwin);
 
@@ -499,10 +631,10 @@ new MutationObserver(clearInk)
 const rad = d => d*Math.PI/180;
 const PRESETS = {
   // 항세기: 태양 하나 — 규칙적이고 예측 가능한 시대
-  stable: { L1:1.2, L2:0.8, M1:1.1, M2:0.9, G:9.8,  D:0.02, T:1500,
+  stable: { L1:1.2, L2:0.85, M1:1.1, M2:0.9, G:9.8,  D:0.02, T:1500,
             s:[rad(24), 0, rad(24), 0],   twin:false, inf:false },
   // 난세기: 삼일능공 — 세 태양의 인력(3×9.8), 뒤집힌 초기 상태
-  chaos:  { L1:1,   L2:1,   M1:1.1, M2:0.9, G:29.4, D:0,    T:1500,
+  chaos:  { L1:1.2, L2:0.85, M1:1.1, M2:0.9, G:29.4, D:0,    T:1500,
             s:[rad(175), 0, rad(-160), 0], twin:true,  inf:true },
 };
 function setCtl(k, v){
@@ -518,22 +650,100 @@ function applyPreset(p){
   paused = false; $("btnPause").textContent = "일시정지";
   clearTraces(); syncTwin();
 }
-$("btnStable").addEventListener("click", ()=>applyPreset(PRESETS.stable));
-$("btnChaos").addEventListener("click", ()=>applyPreset(PRESETS.chaos));
+// ── 삼체 프리셋 ──
+const TRI = {
+  // 항세기: A·B 쌍성이 서로 공전하고 프록시마는 멀리서 도는 안정 위계 —
+  //         행성은 태양 A의 궤도에 붙잡혀 해가 규칙적으로 뜬다
+  stable: { twin:false, b:[
+    [-0.9,  0,    0,    -0.45], [ 1.1,  0,    0,     0.55],
+    [ 0,    4,    0.707, 0   ], [-0.5,  0,    0,    -2.108] ]},
+  // 난세기: 세 태양의 카오스 무도 — 행성은 그 한가운데.
+  // 수치 탐색으로 고른 초기 조건: 세 태양(프록시마 포함)이 100초 이상
+  // 흩어지지 않고 근접 조우를 반복한다
+  chaos:  { twin:true, b:[
+    [ 1.142, -0.754,  0.054,  0.016], [-0.908,  1.287, -0.046, -0.013],
+    [-1.243, -0.677, -0.147, -0.045], [ 0.1,    0.2,    0.218, -0.392] ]},
+};
+function applyTriPreset(p){
+  lastTri = p;
+  u = p.b.flat();
+  // 세 태양의 총운동량을 0으로 보정 — 계가 화면 밖으로 표류하지 않게
+  let px = 0, py = 0, mm = 0;
+  for(let i=0;i<3;i++){ px += TB.M[i]*u[4*i+2]; py += TB.M[i]*u[4*i+3]; mm += TB.M[i]; }
+  for(let i=0;i<4;i++){ u[4*i+2] -= px/mm; u[4*i+3] -= py/mm; }
+  $("twin").checked = p.twin;
+  cam = null;                       // 카메라를 새 배치에 맞춰 재조준
+  paused = false; $("btnPause").textContent = "일시정지";
+  clearTraces(); syncTwin();
+}
+
+$("btnStable").addEventListener("click", ()=>
+  mode === "pend" ? applyPreset(PRESETS.stable) : applyTriPreset(TRI.stable));
+$("btnChaos").addEventListener("click", ()=>
+  mode === "pend" ? applyPreset(PRESETS.chaos) : applyTriPreset(TRI.chaos));
 
 $("btnPause").addEventListener("click", e=>{
   paused = !paused;
   e.target.textContent = paused ? "재생" : "일시정지";
 });
 $("btnReset").addEventListener("click", ()=>{
+  if(mode === "tri"){ applyTriPreset(lastTri); return; }
   s = [Math.PI*0.75, 0, Math.PI*0.55, 0];
   clearTraces(); syncTwin();
 });
 $("btnRand").addEventListener("click", ()=>{
+  if(mode === "tri"){
+    // 행성만 무작위 재배치 — 태양들의 무도는 그대로
+    const cx = (u[0]+u[4]+u[8])/3, cy = (u[1]+u[5]+u[9])/3;
+    const a = Math.random()*2*Math.PI, r = 0.5 + 2.5*Math.random();
+    u[12] = cx + r*Math.cos(a); u[13] = cy + r*Math.sin(a);
+    u[14] = (Math.random()-0.5)*1.2; u[15] = (Math.random()-0.5)*1.2;
+    clearTraces(); syncTwin(); return;
+  }
   s = [ (Math.random()*1.6+0.4)*Math.PI * (Math.random()<.5?-1:1), 0,
         (Math.random()*2-1)*Math.PI, 0 ];
   clearTraces(); syncTwin();
 });
+
+// ── 모드 전환 ──
+const hintEl = $("hint"), lb = [$("lb1"),$("lb2"),$("lb3"),$("lb4")];
+const twinLab = $("twinLab"), twinNote = $("twinNote"), presetNote = $("presetNote");
+const MODE_TXT = {
+  pend: { hint: hintEl.textContent,
+          labs: lb.map(e=>e.textContent),
+          twin: twinLab.textContent,
+          twinNote: twinNote.innerHTML,
+          note: presetNote.innerHTML },
+  tri:  { hint: "행성을 드래그해서 옮겨 보세요 — 화면은 세 태양을 자동 추적합니다",
+          labs: ["행성 → A", "행성 → B", "행성 → 프록시마", "행성 속력"],
+          twin: "쌍둥이 행성 (Δx = 0.001)",
+          twinNote: "위치가 0.001만 다른 행성을 겹쳐 놓습니다. 곧 전혀 다른 운명으로 갈라집니다 — 초기 조건 민감성.",
+          note: "이 모드는 실제 만유인력 시뮬레이션입니다. 태양 A·B(질량 1.1·0.9)와 프록시마(0.12)가 서로를 끌어당기며 움직이고, 행성은 그 사이를 떠도는 시험 입자입니다. <b>항세기</b>는 행성이 태양 A의 궤도에 붙잡힌 시대 — 해가 규칙적으로 뜹니다. <b>난세기</b>는 세 태양이 얽혀 추는 카오스 무도 — 행성은 붙잡혔다 내던져지고, 때로 계 밖으로 추방됩니다." },
+};
+function setMode(m){
+  if(m === mode) return;
+  mode = m;
+  $("mPend").classList.toggle("on", m === "pend");
+  $("mTri").classList.toggle("on", m === "tri");
+  for(const el of document.querySelectorAll(".pend-only"))
+    el.style.display = m === "pend" ? "" : "none";
+  const t = MODE_TXT[m];
+  hintEl.textContent = t.hint;
+  lb.forEach((e,i)=> e.textContent = t.labs[i]);
+  twinLab.textContent = t.twin;
+  twinNote.innerHTML = t.twinNote;
+  presetNote.innerHTML = t.note;
+  if(m === "tri"){
+    // 카메라가 움직이므로 화면 고정형 잉크(∞)는 삼체 모드에서 쓸 수 없다
+    inf.checked = false; inf.disabled = true; $("T").disabled = false;
+    if(!u) applyTriPreset(TRI.chaos);
+  }else{
+    inf.disabled = false;
+  }
+  clearTraces(); syncTwin();
+}
+$("mPend").addEventListener("click", ()=>setMode("pend"));
+$("mTri").addEventListener("click", ()=>setMode("tri"));
 
 resize();
 requestAnimationFrame(frame);
