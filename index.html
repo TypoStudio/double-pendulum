@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#F2F0E9" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#131A26" media="(prefers-color-scheme: dark)">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
 <title>이중 진자 — 3점 · 2축</title>
 <style>
   :root{
@@ -89,8 +91,8 @@
   }
   .stage{position:relative; min-height:420px;}
   @media (max-width:760px){
-    /* 모바일: 캔버스가 화면의 절반 이상을 차지하고 컨트롤은 아래로 스크롤 */
-    .stage{min-height:56dvh;}
+    /* 모바일: 캔버스가 화면 전체를 차지하고 설정은 팝업으로 연다 */
+    .stage{min-height:0;}
   }
   /* 터치 기기: 슬라이더 썸과 버튼 히트 영역 확대 */
   @media (pointer:coarse){
@@ -114,8 +116,27 @@
     overflow-y:auto;
     display:flex; flex-direction:column; gap:1.15rem;
   }
+  #btnPanel{display:none; flex:0 0 auto; margin-left:auto;}
+  .panel-close{display:none;}
+  .backdrop{display:none;}
   @media (max-width:760px){
-    aside{border-left:none; border-top:1px solid var(--panel-line);}
+    #btnPanel{display:block;}
+    aside{
+      position:fixed; left:0; right:0; bottom:0; z-index:20;
+      max-height:82dvh;
+      border-left:none; border-top:1px solid var(--panel-line);
+      padding-bottom:calc(1.5rem + env(safe-area-inset-bottom));
+      transform:translateY(100%); visibility:hidden;
+      transition:transform .25s ease, visibility .25s;
+    }
+    body.panel-open aside{transform:none; visibility:visible;}
+    .backdrop{
+      display:block; position:fixed; inset:0; z-index:15;
+      background:rgba(0,0,0,.35);
+      opacity:0; pointer-events:none; transition:opacity .25s ease;
+    }
+    body.panel-open .backdrop{opacity:1; pointer-events:auto;}
+    .panel-close{display:block; flex:0 0 auto; align-self:flex-end;}
   }
 
   .readout{
@@ -199,6 +220,7 @@
 <header>
   <h1>이중 진자</h1>
   <span class="sub">고정축 O · 관절축 P₁ · 추 P₂ — 2축 3점의 카오스 운동</span>
+  <button id="btnPanel">설정</button>
 </header>
 
 <main>
@@ -208,6 +230,7 @@
   </div>
 
   <aside>
+    <button id="btnClose" class="panel-close">닫기</button>
     <div class="btns">
       <button id="mPend" class="on">이중 진자</button>
       <button id="mTri">삼체 궤도</button>
@@ -273,6 +296,8 @@
     </fieldset>
   </aside>
 </main>
+
+<div class="backdrop" id="backdrop"></div>
 
 <script>
 "use strict";
@@ -744,6 +769,12 @@ function setMode(m){
 }
 $("mPend").addEventListener("click", ()=>setMode("pend"));
 $("mTri").addEventListener("click", ()=>setMode("tri"));
+
+// ── 모바일 설정 팝업 ──
+const openPanel = o => document.body.classList.toggle("panel-open", o);
+$("btnPanel").addEventListener("click", ()=>openPanel(true));
+$("btnClose").addEventListener("click", ()=>openPanel(false));
+$("backdrop").addEventListener("click", ()=>openPanel(false));
 
 resize();
 requestAnimationFrame(frame);
