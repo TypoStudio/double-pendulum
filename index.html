@@ -217,7 +217,12 @@
     font-size:.78rem; letter-spacing:.03em; cursor:pointer;
   }
   label.toggle input{accent-color:var(--trace-twin); width:15px; height:15px;}
-  .twin-note{font-size:.7rem; color:var(--ink-soft); margin:.1rem 0 0; line-height:1.5;}
+  .twin-note{font-size:.7rem; color:var(--ink-soft); margin:.1rem 0 0; line-height:1.55;}
+  /* 프리셋 설명: 항목마다 줄을 띄우고 이름은 진하게 — 긴 문단으로 뭉치지 않게 */
+  .twin-note .it{margin-top:.6rem; padding-left:.55rem; border-left:1px solid var(--panel-line);}
+  .twin-note .it:first-child{margin-top:0;}
+  .twin-note .it b{color:var(--ink); letter-spacing:.02em;}
+  .twin-note .foot{margin-top:.6rem;}
   .swatch{display:inline-block; width:.7em; height:.7em; border-radius:50%; vertical-align:baseline; margin-right:.3em;}
 </style>
 </head>
@@ -292,7 +297,7 @@
         <button id="btnChaos">난세기</button>
         <button id="btnThird" style="display:none">금성 스윙바이</button>
       </div>
-      <p class="twin-note" id="presetNote">질량은 알파 센타우리 A·B의 태양질량비(m₁=1.1, m₂=0.9), 길이는 두 별의 반지름비(R_A≈1.22, R_B≈0.86 R☉ → L₁=1.2, L₂=0.85). <b>항세기</b>는 태양 하나가 규칙적으로 뜨는 안정기 — g=9.8, 작은 진폭, 약한 감쇠. <b>난세기</b>는 세 태양이 함께 뜨는 삼일능공 — g=29.4(3×9.8), 뒤집힌 초기 상태에 쌍둥이 진자·영구 궤적을 켜서 삼체 문제의 예측 불가능성을 기록합니다.</p>
+      <div class="twin-note" id="presetNote"><div class="it"><b>항세기</b> — 태양 하나가 규칙적으로 뜨는 안정기. g=9.8, 작은 진폭에 약한 감쇠.</div><div class="it"><b>난세기</b> — 세 태양이 함께 뜨는 삼일능공. g=29.4(3×9.8), 뒤집힌 초기 상태에 쌍둥이 진자·영구 궤적을 켜서 예측 불가능성을 기록합니다.</div><div class="foot">질량은 알파 센타우리 A·B의 태양질량비(m₁=1.1, m₂=0.9), 길이는 두 별의 반지름비(R_A≈1.22, R_B≈0.86 R☉ → L₁=1.2, L₂=0.85)에서 왔습니다.</div></div>
     </fieldset>
 
     <fieldset>
@@ -978,13 +983,18 @@ const MODE_TXT = {
           labs: ["행성 → A", "행성 → B", "행성 → 프록시마", "행성 속력"],
           twin: "쌍둥이 행성 (Δx = 0.001)",
           twinNote: "위치가 0.001만 다른 행성을 겹쳐 놓습니다. 곧 전혀 다른 운명으로 갈라집니다 — 초기 조건 민감성.",
-          note: "이 모드는 실제 만유인력 시뮬레이션입니다. 태양 A·B(질량 1.1·0.9)와 프록시마(0.12)가 서로를 끌어당기며 움직이고, 행성은 그 사이를 떠도는 시험 입자입니다. <b>항세기</b>는 행성이 태양 A의 궤도에 붙잡힌 시대 — 해가 규칙적으로 뜹니다. <b>난세기</b>는 세 태양이 얽혀 추는 카오스 무도 — 행성은 붙잡혔다 내던져지고, 때로 계 밖으로 추방됩니다.",
+          note: "<div class=\"it\"><b>항세기</b> — 행성이 태양 A의 궤도에 붙잡힌 시대. 해가 규칙적으로 뜹니다.</div>"
+              + "<div class=\"it\"><b>난세기</b> — 세 태양이 얽혀 추는 카오스 무도. 행성은 붙잡혔다 내던져지고, 때로 계 밖으로 추방됩니다.</div>"
+              + "<div class=\"foot\">실제 만유인력 시뮬레이션입니다. 태양 A·B(질량 1.1·0.9)와 프록시마(0.12)가 서로를 끌어당기며 움직이고, 행성은 그 사이를 떠도는 시험 입자입니다.</div>",
           pre: ["항세기", "난세기"], preLegend: "프리셋 — 소설 『삼체』" },
   swing:{ hint: "탐사선을 드래그해 보세요 — 놓은 자리의 원궤도 속도로 다시 출발합니다",
           labs: ["속력 (태양 기준)", "지구까지 거리", "목성까지 거리", "최대 속력"],
           twin: "쌍둥이 탐사선 (Δx = 0.001)",
           twinNote: "위치가 0.001만 다른 탐사선을 겹쳐 놓습니다. 태양·목성을 스칠 때마다 차이가 증폭됩니다 — 근접 통과의 민감성.",
-          note: "<b>목성 왕복</b>: 탐사선이 <span class=\"swatch\" style=\"background:var(--trace-twin)\"></span>지구(R=2.2)를 떠나 태양으로 떨어져 근일점 0.8을 스치는 <b>태양 스윙바이</b>로 <span class=\"swatch\" style=\"background:var(--ink-soft)\"></span>목성(R=5)에 도착 — 감속 분사로 목성 궤도에 잡혀 <b>세 바퀴 남짓 빠르게 돌며 관측</b>한 뒤, 탈출 분사로 목성을 벗어나 귀환 궤도에 올라 지구로 돌아와 안착합니다(갈릴레오 방식). <b>목성 탈출</b>: 같은 태양 스윙바이 뒤 목성 뒤쪽을 스치며 가속, 태양계를 떠납니다(보이저). <b>금성 경유</b>: 지구 뒤로 감속 발사해 안쪽 <span class=\"swatch\" style=\"background:var(--ink-soft)\"></span>금성(R=1.5)을 스윙바이하고, 그 반동으로 목성까지 날아가 같은 방식으로 궤도에 진입·관측한 뒤 지구로 돌아옵니다. 두 왕복 모두 분사 네 번 외에는 중력만으로 움직이고, 궤적이 꺾이는 그 네 지점을 별표로 표시합니다 — <b>1</b> 목성 궤도 진입 · <b>2</b> 탈출 · <b>3</b> 귀환 궤도 진입 · <b>4</b> 지구 안착.",
+          note: "<div class=\"it\"><b>목성 왕복</b> — <span class=\"swatch\" style=\"background:var(--trace-twin)\"></span>지구(R=2.2)를 떠나 태양으로 떨어져 근일점 0.8을 스치는 <b>태양 스윙바이</b>로 <span class=\"swatch\" style=\"background:var(--ink-soft)\"></span>목성(R=5)에 도착. 감속 분사로 궤도에 잡혀 세 바퀴 남짓 빠르게 돌며 관측한 뒤, 귀환 궤도에 올라 지구에 안착합니다(갈릴레오 방식).</div>"
+              + "<div class=\"it\"><b>목성 탈출</b> — 같은 태양 스윙바이 뒤 목성 뒤쪽을 스치며 가속해 태양계를 떠납니다(보이저). 기동 없이 순수 중력.</div>"
+              + "<div class=\"it\"><b>금성 경유</b> — 지구 뒤로 감속 발사해 안쪽 <span class=\"swatch\" style=\"background:var(--ink-soft)\"></span>금성(R=1.5)을 스윙바이하고, 그 반동으로 목성까지 날아가 같은 방식으로 관측·귀환합니다.</div>"
+              + "<div class=\"foot\">두 왕복의 분사 지점은 별표와 순번으로 표시됩니다 — <b>1</b> 궤도 진입 · <b>2</b> 탈출 · <b>3</b> 귀환 궤도 진입 · <b>4</b> 지구 안착. 이 네 번 외에는 전부 중력만으로 움직입니다.</div>",
           pre: ["목성 왕복", "목성 탈출", "금성 경유"], preLegend: "프리셋 — 스윙바이: 지구 → 태양·금성 → 목성" },
 };
 function setMode(m){
