@@ -325,6 +325,7 @@ let s  = [Math.PI*0.75, 0, Math.PI*0.55, 0];
 let s2 = null;                 // 쌍둥이
 let trails = {};    // key → {pts:[], col} — 움직이는 모든 점의 잔상
 let lastPts = {};   // 잉크 레이어(∞)의 직전 점들
+let burns = [];     // 분사 지점 {x,y,n} — 세계좌표라 카메라가 움직여도 제자리
 function pushTrail(key, col, p){
   const t = trails[key] || (trails[key] = {pts:[], col});
   t.pts.push(p);
@@ -430,14 +431,14 @@ function joiStep(){
   if(cap.state === 3){
     if(Math.hypot(u[pb]-u[4], u[pb+1]-u[5]) < c.arrive){
       u[pb+2] = u[6]; u[pb+3] = u[7];
-      cap.state = 4;
+      cap.state = 4; burns.push({x:u[pb], y:u[pb+1], n:4});
     }
   }else if(cap.state === 2){
     if(d > c.hill){
       const rx = u[pb]-u[0], ry = u[pb+1]-u[1], r = Math.hypot(rx, ry);
       const v = Math.sqrt(GC.M[0]*(2/r - 2/(r+2.2)));
       u[pb+2] = u[2] - v*ry/r; u[pb+3] = u[3] + v*rx/r;
-      cap.state = 3;
+      cap.state = 3; burns.push({x:u[pb], y:u[pb+1], n:3});
     }
   }else if(cap.state === 1){
     const a = Math.atan2(dy, dx);
@@ -448,13 +449,14 @@ function joiStep(){
       const rvx = u[pb+2]-u[di+2], rvy = u[pb+3]-u[di+3], rv = Math.hypot(rvx, rvy);
       const k = c.esc*Math.sqrt(2*MJ/d)/rv;
       u[pb+2] = u[di+2] + rvx*k; u[pb+3] = u[di+3] + rvy*k;
-      cap.state = 2;
+      cap.state = 2; burns.push({x:u[pb], y:u[pb+1], n:2});
     }
   }else if(d < c.trig){
     const vc = Math.sqrt(MJ/d), tx = -dy/d, ty = dx/d;
     const sgn = ((u[pb+2]-u[di+2])*tx + (u[pb+3]-u[di+3])*ty) >= 0 ? 1 : -1;
     u[pb+2] = u[di+2] + sgn*vc*tx; u[pb+3] = u[di+3] + sgn*vc*ty;
     cap.state = 1; cap.wind = 0; cap.prevA = Math.atan2(dy, dx);
+    burns.push({x:u[pb], y:u[pb+1], n:1});
   }
 }
 
@@ -496,6 +498,28 @@ function domIndex(){
     if(a > ba){ ba = a; best = i; }
   }
   return best;
+}
+
+// 분사 지점: 불꽃 모양 별표와 순번 — 궤적이 꺾인 자리가 기동임을 드러낸다
+function drawBurns(){
+  if(!burns.length) return;
+  ctx.strokeStyle = css("--trace"); ctx.fillStyle = css("--trace");
+  ctx.lineWidth = 1.2; ctx.lineCap = "round";
+  ctx.font = '600 9px "Futura","Avenir Next",system-ui,sans-serif';
+  ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  for(const b of burns){
+    const [x,y] = w2s([b.x, b.y]);
+    ctx.globalAlpha = 0.9;
+    ctx.beginPath();
+    for(let k=0;k<3;k++){
+      const a = k*Math.PI/3, cx = 5*Math.cos(a), cy = 5*Math.sin(a);
+      ctx.moveTo(x-cx, y-cy); ctx.lineTo(x+cx, y+cy);
+    }
+    ctx.stroke();
+    ctx.globalAlpha = 0.75;
+    ctx.fillText(b.n, x + 8, y - 7);
+  }
+  ctx.globalAlpha = 1;
 }
 
 function drawGrav(){
@@ -554,7 +578,7 @@ function clearInk(){
   lastPts = {};
 }
 let swVmax = 0;   // 스윙바이 읽기값: 태양 기준 최대 속력
-function clearTraces(){ trails = {}; swVmax = 0; clearInk(); }
+function clearTraces(){ trails = {}; burns = []; swVmax = 0; clearInk(); }
 
 function drawGrid(w,h){
   const step = 28;
@@ -650,6 +674,7 @@ function frame(now){
   drawGrid(w,h);
   if(mode !== "pend"){
     for(const t of Object.values(trails)) drawTrail(t.pts.map(pt=>w2s(pt)), css(t.col));
+    drawBurns();
     drawGrav();
   }else if(infinite){
     ctx.drawImage(ink, 0, 0, w, h);
@@ -959,7 +984,7 @@ const MODE_TXT = {
           labs: ["속력 (태양 기준)", "지구까지 거리", "목성까지 거리", "최대 속력"],
           twin: "쌍둥이 탐사선 (Δx = 0.001)",
           twinNote: "위치가 0.001만 다른 탐사선을 겹쳐 놓습니다. 태양·목성을 스칠 때마다 차이가 증폭됩니다 — 근접 통과의 민감성.",
-          note: "<b>목성 왕복</b>: 탐사선이 <span class=\"swatch\" style=\"background:var(--trace-twin)\"></span>지구(R=2.2)를 떠나 태양으로 떨어져 근일점 0.8을 스치는 <b>태양 스윙바이</b>로 <span class=\"swatch\" style=\"background:var(--ink-soft)\"></span>목성(R=5)에 도착 — 감속 분사로 목성 궤도에 잡혀 <b>세 바퀴 남짓 빠르게 돌며 관측</b>한 뒤, 탈출 분사로 목성을 벗어나 귀환 궤도에 올라 지구로 돌아와 안착합니다(갈릴레오 방식). <b>목성 탈출</b>: 같은 태양 스윙바이 뒤 목성 뒤쪽을 스치며 가속, 태양계를 떠납니다(보이저). <b>금성 경유</b>: 지구 뒤로 감속 발사해 안쪽 <span class=\"swatch\" style=\"background:var(--ink-soft)\"></span>금성(R=1.5)을 스윙바이하고, 그 반동으로 목성까지 날아가 같은 방식으로 궤도에 진입·관측한 뒤 지구로 돌아옵니다. 두 왕복 모두 분사 네 번(궤도 진입·탈출·귀환 궤도·지구 안착) 외에는 중력만으로 움직입니다.",
+          note: "<b>목성 왕복</b>: 탐사선이 <span class=\"swatch\" style=\"background:var(--trace-twin)\"></span>지구(R=2.2)를 떠나 태양으로 떨어져 근일점 0.8을 스치는 <b>태양 스윙바이</b>로 <span class=\"swatch\" style=\"background:var(--ink-soft)\"></span>목성(R=5)에 도착 — 감속 분사로 목성 궤도에 잡혀 <b>세 바퀴 남짓 빠르게 돌며 관측</b>한 뒤, 탈출 분사로 목성을 벗어나 귀환 궤도에 올라 지구로 돌아와 안착합니다(갈릴레오 방식). <b>목성 탈출</b>: 같은 태양 스윙바이 뒤 목성 뒤쪽을 스치며 가속, 태양계를 떠납니다(보이저). <b>금성 경유</b>: 지구 뒤로 감속 발사해 안쪽 <span class=\"swatch\" style=\"background:var(--ink-soft)\"></span>금성(R=1.5)을 스윙바이하고, 그 반동으로 목성까지 날아가 같은 방식으로 궤도에 진입·관측한 뒤 지구로 돌아옵니다. 두 왕복 모두 분사 네 번 외에는 중력만으로 움직이고, 궤적이 꺾이는 그 네 지점을 별표로 표시합니다 — <b>1</b> 목성 궤도 진입 · <b>2</b> 탈출 · <b>3</b> 귀환 궤도 진입 · <b>4</b> 지구 안착.",
           pre: ["목성 왕복", "목성 탈출", "금성 경유"], preLegend: "프리셋 — 스윙바이: 지구 → 태양·금성 → 목성" },
 };
 function setMode(m){
