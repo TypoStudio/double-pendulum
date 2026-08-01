@@ -21,6 +21,9 @@
     --panel-line:#C9C4B4;
     --knob:#22304A;
     --sun:#C08A2E;
+    --sun-a:#FFE091;
+    --sun-b:#FFAA5B;
+    --sun-c:#E56849;
   }
   @media (prefers-color-scheme: dark){
     :root{
@@ -324,6 +327,7 @@ const ictx = ink.getContext("2d");
 const P = { L1:1, L2:1, M1:1, M2:1, G:9.8, D:0, S:1, T:1500 };
 let paused = false;
 let mode = "pend";             // "pend" 이중 진자 | "tri" 삼체 궤도
+let planetSpin = 0;             // 행성의 자전 위상 — 파노라마의 낮과 밤을 만든다
 
 // 상태: [θ1, ω1, θ2, ω2]
 let s  = [Math.PI*0.75, 0, Math.PI*0.55, 0];
@@ -372,7 +376,7 @@ const TB = { M:[1.1, 0.9, 0.12], eps:0.05, cap:25, rb:10 };
 const SW = { M:[30, 0.02, 0.35], eps:0.02, cap:24, rb:20, ts:0.233 };
 let GC = TB;           // 현재 중력 모드 설정 (tri → TB, swing → SW)
 const probeBase = ()=> 4*GC.M.length;   // 시험 입자(행성/탐사선) 시작 인덱스
-const gCol = i => mode !== "swing" ? "--sun"
+const gCol = i => mode !== "swing" ? ["--sun-a","--sun-b","--sun-c"][i]
              : i === 0 ? "--sun" : i === 1 ? "--trace-twin" : "--ink-soft";
 let u = null;          // [x,y,vx,vy] × (인력체들 + 시험 입자 + 쌍둥이 0~1)
 let lastG = {};        // 리셋용: 모드별 마지막으로 적용한 중력 프리셋
@@ -412,12 +416,13 @@ function updateCam(){
     for(let b=probeBase(); b<u.length; b+=4)
       R = Math.max(R, Math.hypot(u[b]-cx, u[b+1]-cy) + 1.2);
   R = Math.min(R, GC.cap);           // 몸체가 추방돼도 무한정 축소하지 않는다
-  const k = Math.min(cv.clientWidth, cv.clientHeight)*0.45/R;
+  const k = Math.min(cv.clientWidth, orbitHeight())*0.45/R;
   if(!cam) cam = {cx, cy, k};
   else{ cam.cx += (cx-cam.cx)*0.04; cam.cy += (cy-cam.cy)*0.04; cam.k += (k-cam.k)*0.04; }
 }
-function w2s(p){ return [cv.clientWidth/2 + cam.k*(p[0]-cam.cx), cv.clientHeight/2 - cam.k*(p[1]-cam.cy)]; }
-function s2w(x, y){ return [(x-cv.clientWidth/2)/cam.k + cam.cx, -(y-cv.clientHeight/2)/cam.k + cam.cy]; }
+function orbitHeight(){ return mode === "tri" ? cv.clientHeight*.75 : cv.clientHeight; }
+function w2s(p){ return [cv.clientWidth/2 + cam.k*(p[0]-cam.cx), orbitHeight()/2 - cam.k*(p[1]-cam.cy)]; }
+function s2w(x, y){ return [(x-cv.clientWidth/2)/cam.k + cam.cx, -(y-orbitHeight()/2)/cam.k + cam.cy]; }
 
 // ── 목성 궤도 진입·이탈·지구 안착 기동 (갈릴레오식) ──
 // joi가 있는 프리셋의 4단계 분사. 분사 사이는 모두 순수 중력.
@@ -557,6 +562,155 @@ function drawGrav(){
   const [x,y] = w2s([u[pb], u[pb+1]]);
   ctx.fillStyle = css("--trace");
   ctx.beginPath(); ctx.arc(x, y, 4.5, 0, 7); ctx.fill();
+  if(mode === "tri"){
+    // 행성 표면의 경도 0°를 관성 공간에 표시해 자전 방향과 속도를 드러낸다.
+    const ax = x + Math.cos(planetSpin)*15;
+    const ay = y - Math.sin(planetSpin)*15;
+    ctx.strokeStyle = css("--ink"); ctx.fillStyle = css("--ink");
+    ctx.lineWidth = 1.3; ctx.globalAlpha = .9;
+    ctx.beginPath(); ctx.arc(x,y,8,0,7); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x,y); ctx.lineTo(ax,ay); ctx.stroke();
+    ctx.beginPath(); ctx.arc(ax,ay,2.4,0,7); ctx.fill();
+    ctx.font = '600 9px "Futura","Avenir Next",system-ui,sans-serif';
+    ctx.textAlign = Math.cos(planetSpin) < 0 ? "right" : "left";
+    ctx.textBaseline = "middle";
+    ctx.fillText("경도 0°", ax + (Math.cos(planetSpin) < 0 ? -5 : 5), ay);
+    ctx.globalAlpha = 1;
+  }
+}
+
+// ── 삼체 파노라마 ──
+// 2차원 궤도에서 행성→태양의 방향을 시각각으로 삼고, 행성 자전을 시간각으로
+// 바꿔 구면 천문 공식에 넣는다. 따라서 세 태양은 제 궤도 방향과 거리에 따라
+// 서로 다른 위치에서 뜨고 지며, 지평선 위 태양들의 광량 합으로 하늘이 변한다.
+const SUN_RGB = [[255,224,145], [255,170,91], [229,104,73]];
+const SUN_POWER = [1, .82, .28];
+// 알파 센타우리 A·B·프록시마의 대략적인 반지름비. 겉보기 크기는 R/d로 계산한다.
+const SUN_RADIUS = [1.22, .86, .18];
+const STAR_FIELD = Array.from({length:110}, (_,i)=>({
+  x: ((i*73)%109)/109,
+  y: .05 + (((i*47+19)%101)/101)*.64,
+  r: .45 + (i%5)*.16,
+  a: .32 + (i%7)*.08
+}));
+const clamp01 = v => Math.max(0, Math.min(1, v));
+const mix = (a,b,t) => a.map((v,i)=>Math.round(v+(b[i]-v)*t));
+const rgb = a => `rgb(${a[0]},${a[1]},${a[2]})`;
+const rgba = (a,v) => `rgba(${a[0]},${a[1]},${a[2]},${v})`;
+const wrapPi = a => Math.atan2(Math.sin(a), Math.cos(a));
+
+function panoSuns(){
+  const pb = probeBase(), lat = rad(18);
+  return GC.M.map((m,i)=>{
+    const dx = u[4*i]-u[pb], dy = u[4*i+1]-u[pb];
+    const dist = Math.max(.12, Math.hypot(dx,dy));
+    const bearing = Math.atan2(dy,dx);
+    const hour = wrapPi(planetSpin-bearing);
+    // 서로 조금 다른 적위는 같은 날에도 세 태양의 뜨고 지는 길을 갈라 놓는다.
+    const dec = rad([-11, 7, 19][i]);
+    const alt = Math.asin(Math.sin(lat)*Math.sin(dec) + Math.cos(lat)*Math.cos(dec)*Math.cos(hour));
+    const az = Math.atan2(-Math.sin(hour)*Math.cos(dec),
+      Math.sin(dec)*Math.cos(lat)-Math.cos(dec)*Math.sin(lat)*Math.cos(hour));
+    return {i, m, dist, alt, az, col:SUN_RGB[i]};
+  });
+}
+
+function drawPanorama(w,h){
+  const suns = panoSuns();
+  let light = 0;
+  for(const sun of suns){
+    const above = clamp01((Math.sin(sun.alt)+.06)/.46);
+    light += SUN_POWER[sun.i]*above/Math.max(.7, sun.dist*.42);
+  }
+  light = clamp01(1-Math.exp(-light*1.25));
+  const twilight = clamp01(light*1.7);
+  const zenith = mix([5,9,22], [73,153,210], light);
+  const horizon = mix([17,18,32], [196,222,229], twilight);
+  const dusk = clamp01((light-.02)/.34)*(1-clamp01((light-.36)/.35));
+  const horizonWarm = mix(horizon, [238,132,92], dusk*.7);
+  const groundY = h*.76;
+
+  const sky = ctx.createLinearGradient(0,0,0,groundY);
+  sky.addColorStop(0, rgb(zenith));
+  sky.addColorStop(.7, rgb(mix(zenith,horizonWarm,.72)));
+  sky.addColorStop(1, rgb(horizonWarm));
+  ctx.fillStyle = sky; ctx.fillRect(0,0,w,groundY+1);
+
+  ctx.fillStyle = `rgba(225,235,255,${(1-light)*.9})`;
+  for(const star of STAR_FIELD){
+    ctx.globalAlpha = star.a*(1-light)*(1-light);
+    ctx.beginPath(); ctx.arc(star.x*w, star.y*h, star.r, 0, 7); ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+
+  // 방위 눈금은 긴 파노라마의 360° 공간감을 유지한다.
+  ctx.font = '600 9px "Futura","Avenir Next",system-ui,sans-serif';
+  ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  ctx.fillStyle = rgba(mix([190,205,225],[35,53,69],light), .72);
+  for(let i=0;i<8;i++){
+    const x = w*i/8;
+    ctx.fillRect(x, groundY-10, 1, 5);
+    ctx.fillText(["S","SW","W","NW","N","NE","E","SE"][i], x, groundY-19);
+  }
+
+  for(const sun of suns){
+    if(sun.alt < rad(-8)) continue;
+    let x = (.5 + sun.az/(2*Math.PI))*w;
+    x = ((x%w)+w)%w;
+    // 천정 부근은 파노라마 상단 밖으로 보낸다. 천정에서는 방위각이 급변하므로
+    // 화면 안에 남겨 두면 태양이 좌우로 순간 이동하는 것처럼 보인다.
+    const y = groundY - Math.sin(Math.max(sun.alt,rad(-8)))*(h*1.18);
+    const visible = clamp01((sun.alt+rad(8))/rad(10));
+    // 각지름은 천체의 실제 반지름에 비례하고 관측 거리에는 반비례한다.
+    // 넓은 제한값으로 근접 조우 때 커지고 멀어질 때 점처럼 작아지는 차이를 보존한다.
+    const rr = Math.max(3.5, Math.min(45, 9*SUN_RADIUS[sun.i]/sun.dist));
+    if(y < -rr-18) continue;
+    // 이음선 근처의 태양은 반대쪽에도 한 번 더 그려 360°가 끊기지 않게 한다.
+    for(const sx of [x-w,x,x+w]){
+      if(sx < -rr*4 || sx > w+rr*4) continue;
+      const glow = ctx.createRadialGradient(sx,y,rr*.35,sx,y,rr*3.8);
+      glow.addColorStop(0, rgba(sun.col,.7*visible));
+      glow.addColorStop(.2, rgba(sun.col,.28*visible));
+      glow.addColorStop(1, rgba(sun.col,0));
+      ctx.fillStyle = glow; ctx.fillRect(sx-rr*4,y-rr*4,rr*8,rr*8);
+      ctx.globalAlpha = visible;
+      ctx.fillStyle = rgb(sun.col); ctx.beginPath(); ctx.arc(sx,y,rr,0,7); ctx.fill();
+      ctx.strokeStyle = "rgba(255,255,255,.72)"; ctx.lineWidth = 1; ctx.stroke();
+      ctx.fillStyle = light > .58 ? "rgba(20,30,38,.78)" : "rgba(240,244,250,.88)";
+      ctx.font = '600 10px "Futura","Avenir Next",system-ui,sans-serif';
+      ctx.fillText(GC.names[sun.i], sx, y-rr-12);
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  // 수평선 아래는 불투명한 바다로 끝까지 채운다.
+  const seaTop = mix([7,20,31],[45,112,135],light);
+  const seaBottom = mix([2,7,14],[10,39,58],light);
+  const sea = ctx.createLinearGradient(0,groundY,0,h);
+  sea.addColorStop(0, rgb(seaTop));
+  sea.addColorStop(1, rgb(seaBottom));
+  ctx.fillStyle = sea; ctx.fillRect(0,groundY,w,h-groundY+1);
+  ctx.strokeStyle = rgba(mix([75,105,126],[199,224,221],light), .18+.28*light);
+  ctx.lineWidth = 1;
+  for(let row=0;row<5;row++){
+    const base = groundY + 5 + row*9;
+    ctx.beginPath();
+    for(let x=0;x<=w;x+=8){
+      const y = base + Math.sin(x*.025 + row*1.7 + planetSpin*1.4)*(1.3+row*.35);
+      if(x===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+    }
+    ctx.stroke();
+  }
+  ctx.strokeStyle = rgba(mix([125,146,159],[226,225,181],light), .3+.25*light);
+  ctx.beginPath(); ctx.moveTo(0,groundY+.5); ctx.lineTo(w,groundY+.5); ctx.stroke();
+
+  ctx.fillStyle = light > .5 ? "rgba(17,38,50,.72)" : "rgba(225,235,244,.78)";
+  ctx.font = '600 9px "Futura","Avenir Next",system-ui,sans-serif';
+  ctx.textAlign = "right"; ctx.textBaseline = "top";
+  ctx.fillText(`본초자오선 0° · 자전 ${((planetSpin*180/Math.PI)%360).toFixed(0)}°`, w-12, 10);
+
+  const up = suns.filter(sun=>sun.alt>0).length;
+  return {light, up};
 }
 
 function scalePx(){
@@ -654,6 +808,7 @@ function frame(now){
       if(mode === "pend"){ s = rk4(s, H); if(s2) s2 = rk4(s2, H); }
       else{ u = rk4(u, H, derivGrav); joiStep(); }
     }
+    if(mode === "tri") planetSpin = (planetSpin + n*H*.78)%(2*Math.PI);
     if(mode !== "pend") reboundPlanets(n*H);
     // 움직이는 모든 점이 잔상을 남긴다 (진자: 화면좌표, 삼체: 세계좌표 — 카메라가 움직이므로)
     // 먼저 넣은 궤적이 아래에 깔린다: 쌍둥이 → 관절/태양 → 추/행성
@@ -676,11 +831,15 @@ function frame(now){
   }
   const w = cv.clientWidth, h = cv.clientHeight;
   ctx.clearRect(0,0,w,h);
-  drawGrid(w,h);
+  const oh = mode === "tri" ? orbitHeight() : h;
+  drawGrid(w,oh);
   if(mode !== "pend"){
+    ctx.save();
+    ctx.beginPath(); ctx.rect(0,0,w,oh); ctx.clip();
     for(const t of Object.values(trails)) drawTrail(t.pts.map(pt=>w2s(pt)), css(t.col));
     drawBurns();
     drawGrav();
+    ctx.restore();
   }else if(infinite){
     ctx.drawImage(ink, 0, 0, w, h);
   }else{
@@ -690,13 +849,25 @@ function frame(now){
     if(s2) drawPendulum(s2, css("--ink-soft"), css("--trace-twin"), true);
     drawPendulum(s, css("--ink"), css("--trace"), false);
   }
+  if(mode === "tri"){
+    ctx.save();
+    ctx.beginPath(); ctx.rect(0,oh,w,h-oh); ctx.clip();
+    ctx.translate(0,oh);
+    const sky = drawPanorama(w,h-oh);
+    ctx.restore();
+    ctx.strokeStyle = css("--panel-line"); ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(0,oh+.5); ctx.lineTo(w,oh+.5); ctx.stroke();
+    const phase = sky.light > .56 ? "낮" : sky.light > .08 ? "박명" : "밤";
+    domEl.textContent = `하늘 · ${phase} · 떠 있는 태양 ${sky.up}`;
+  }
   updateReadout();
   requestAnimationFrame(frame);
 }
 
 const deg = r => ((r*180/Math.PI % 360)+540)%360 - 180;
 function updateReadout(){
-  if(mode !== "pend" && u) domEl.textContent = "중력 지배 · " + (GC.names || [])[domIndex()];
+  if(mode !== "pend" && u && mode !== "tri")
+    domEl.textContent = "중력 지배 · " + (GC.names || [])[domIndex()];
   if(mode === "swing"){
     const pb = probeBase();
     const v = Math.hypot(u[pb+2]-u[2], u[pb+3]-u[3]);   // 태양 기준 속력
@@ -740,6 +911,7 @@ cv.addEventListener("pointerdown", e=>{
   const r = cv.getBoundingClientRect();
   const mx = e.clientX - r.left, my = e.clientY - r.top;
   if(mode !== "pend"){
+    if(mode === "tri" && my > orbitHeight()) return;
     const pb = probeBase();
     const [x,y] = w2s([u[pb], u[pb+1]]);
     if(Math.hypot(mx-x, my-y) < 40){
@@ -878,6 +1050,7 @@ function applyGPreset(p){
   GC.names = p.names;          // 인력 우세 표시용 천체 이름
   cap = p.joi ? {state:0, wind:0, prevA:0} : null;
   u = p.b.flat();
+  if(mode === "tri") planetSpin = 0;
   // 인력체들의 총운동량을 0으로 보정 — 계가 화면 밖으로 표류하지 않게
   let px = 0, py = 0, mm = 0;
   for(let i=0;i<GC.M.length;i++){ px += GC.M[i]*u[4*i+2]; py += GC.M[i]*u[4*i+3]; mm += GC.M[i]; }
@@ -1027,6 +1200,9 @@ function setMode(m){
     domEl.textContent = "";
     markPreset(pendKey);       // 진자 모드로 돌아오면 그 모드의 프리셋 표시를 되살린다
   }
+  cv.setAttribute("aria-label", m === "tri" ? "삼체 궤도와 세 태양의 낮과 밤 파노라마"
+    : m === "pend" ? "이중 진자 시뮬레이션" : "스윙바이 궤도 시뮬레이션");
+  if(m === "tri") hintEl.textContent = "위쪽은 삼체 궤도 · 아래쪽은 행성에서 본 세 태양의 하늘";
   clearTraces(); syncTwin();
 }
 $("mPend").addEventListener("click", ()=>setMode("pend"));
